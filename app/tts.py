@@ -1,4 +1,4 @@
-"""EMA Lightning wrapper: one model instance for the process lifetime."""
+"""TTS adapter (EMA Lightning): one model instance for the process lifetime."""
 
 from __future__ import annotations
 

@@ -1,0 +1,37 @@
+name: turkce-tts-api
+
+services:
+  tts:
+    build: .
+    image: turkce-tts-api:local
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HF_HOME: /data/huggingface
+      XDG_CACHE_HOME: /data/cache
+    volumes:
+      - turkce-tts-api-model-cache:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+
+  ui:
+    image: nginx:1.27-alpine
+    ports:
+      - "${UI_PORT:-3000}:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+      - ./ui/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - tts
+    restart: unless-stopped
+
+volumes:
+  turkce-tts-api-model-cache:

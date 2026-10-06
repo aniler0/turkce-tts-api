@@ -1,0 +1,13 @@
+.venv
+.git
+.gitignore
+__pycache__
+*.py[cod]
+*.wav
+.env
+.mypy_cache
+.ruff_cache
+.pytest_cache
+*.md
+.DS_Store
+ui

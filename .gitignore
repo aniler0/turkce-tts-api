@@ -5,5 +5,7 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 *.wav
+!samples/demo.wav
 .mypy_cache/
 .ruff_cache/
+.env

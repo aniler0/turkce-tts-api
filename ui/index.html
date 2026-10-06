@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>turkce-tts-api</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0f1115;
+        --panel: #1a1d24;
+        --border: #2c313c;
+        --text: #e8eaed;
+        --muted: #9aa0a6;
+        --accent: #6ea8fe;
+        --accent-text: #0b1220;
+        --danger: #f87171;
+        --listen: #34d399;
+        --listen-text: #06281c;
+        --bubble-user: #243044;
+        --bubble-bot: #22262f;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f4f6f8;
+          --panel: #ffffff;
+          --border: #d8dee6;
+          --text: #1f2328;
+          --muted: #656d76;
+          --accent: #2563eb;
+          --accent-text: #ffffff;
+          --danger: #dc2626;
+          --listen: #059669;
+          --listen-text: #ffffff;
+          --bubble-user: #e8f0fe;
+          --bubble-bot: #f0f2f5;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font: 16px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        place-items: start center;
+        padding: 1.5rem 1rem 2rem;
+      }
+      main {
+        width: min(680px, 100%);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        display: grid;
+        gap: 1rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.3rem;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+      .tabs button {
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .tabs button.active {
+        background: var(--accent);
+        color: var(--accent-text);
+        border-color: transparent;
+      }
+      label {
+        display: grid;
+        gap: 0.35rem;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+      textarea,
+      input,
+      select,
+      button {
+        font: inherit;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        padding: 0.7rem 0.85rem;
+      }
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+      }
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+      @media (max-width: 560px) {
+        .row,
+        .actions,
+        .tabs {
+          grid-template-columns: 1fr;
+        }
+      }
+      button {
+        border: none;
+        background: var(--accent);
+        color: var(--accent-text);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.listen {
+        background: var(--listen);
+        color: var(--listen-text);
+      }
+      button.listen.listening {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.65;
+        }
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      audio {
+        width: 100%;
+      }
+      .meta {
+        font-size: 0.9rem;
+        color: var(--muted);
+        min-height: 1.4em;
+      }
+      .error {
+        color: var(--danger);
+      }
+      .log {
+        display: grid;
+        gap: 0.6rem;
+        max-height: 320px;
+        overflow: auto;
+        padding: 0.25rem;
+      }
+      .bubble {
+        padding: 0.7rem 0.85rem;
+        border-radius: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .bubble.user {
+        background: var(--bubble-user);
+        justify-self: end;
+        max-width: 90%;
+      }
+      .bubble.assistant {
+        background: var(--bubble-bot);
+        justify-self: start;
+        max-width: 90%;
+      }
+      .bubble .who {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-bottom: 0.2rem;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .status-pill {
+        display: inline-block;
+        font-size: 0.8rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <h1>turkce-tts-api</h1>
+        <p id="subtitle">Kullanıma hazır Türkçe TTS. Ses üretimi bu makinede.</p>
+      </div>
+
+      <div id="tabs" class="tabs hidden">
+        <button type="button" id="tabChat">Sohbet</button>
+        <button type="button" id="tabEcho" class="active">Yankı / metin</button>
+      </div>
+
+      <div id="chatPanel" class="hidden">
+        <div id="log" class="log"></div>
+        <div><span id="status" class="status-pill">Hazır</span></div>
+        <div class="actions">
+          <button id="chatListen" class="listen" type="button">
+            Sohbet Et
+          </button>
+          <button id="chatClear" type="button">Sohbeti temizle</button>
+        </div>
+        <div id="chatMeta" class="meta"></div>
+      </div>
+
+      <div id="echoPanel">
+        <label>
+          Metin
+          <textarea
+            id="text"
+            maxlength="4000"
+            placeholder="Konuş veya yaz…"
+          ></textarea>
+        </label>
+        <div class="row">
+          <label>
+            Hız
+            <input
+              id="speed"
+              type="number"
+              min="0.25"
+              max="4"
+              step="0.05"
+              value="1"
+            />
+          </label>
+          <label>
+            Örnekleme
+            <select id="sampleRate">
+              <option value="48000" selected>48000</option>
+              <option value="24000">24000</option>
+              <option value="16000">16000</option>
+              <option value="8000">8000</option>
+            </select>
+          </label>
+          <label>
+            Seed
+            <input
+              id="seed"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="rastgele"
+            />
+          </label>
+        </div>
+        <div class="actions">
+          <button id="listen" class="listen" type="button">
+            Web Speech API'yi kullan
+          </button>
+          <button id="speak" type="button">Metni Seslendir</button>
+        </div>
+        <div id="meta" class="meta"></div>
+      </div>
+
+      <audio id="player" controls></audio>
+    </main>
+
+    <script>
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      const tabChat = document.getElementById("tabChat");
+      const tabEcho = document.getElementById("tabEcho");
+      const tabsEl = document.getElementById("tabs");
+      const subtitle = document.getElementById("subtitle");
+      const chatPanel = document.getElementById("chatPanel");
+      const echoPanel = document.getElementById("echoPanel");
+      const logEl = document.getElementById("log");
+      const statusEl = document.getElementById("status");
+      const chatListenBtn = document.getElementById("chatListen");
+      const chatClearBtn = document.getElementById("chatClear");
+      const chatMeta = document.getElementById("chatMeta");
+      const player = document.getElementById("player");
+
+      const textEl = document.getElementById("text");
+      const speedEl = document.getElementById("speed");
+      const sampleRateEl = document.getElementById("sampleRate");
+      const seedEl = document.getElementById("seed");
+      const listenBtn = document.getElementById("listen");
+      const speakBtn = document.getElementById("speak");
+      const meta = document.getElementById("meta");
+
+      let history = [];
+      let objectUrl = null;
+      let audioQueue = [];
+      let playing = false;
+      let busy = false;
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function setChatMeta(message, isError = false) {
+        chatMeta.className = isError ? "meta error" : "meta";
+        chatMeta.textContent = message;
+      }
+
+      function setMeta(message, isError = false) {
+        meta.className = isError ? "meta error" : "meta";
+        meta.textContent = message;
+      }
+
+      function addBubble(role, text) {
+        const div = document.createElement("div");
+        div.className = `bubble ${role}`;
+        const who = document.createElement("span");
+        who.className = "who";
+        who.textContent = role === "user" ? "Sen" : "Asistan";
+        div.appendChild(who);
+        div.appendChild(document.createTextNode(text));
+        logEl.appendChild(div);
+        logEl.scrollTop = logEl.scrollHeight;
+        return div;
+      }
+
+      function speakOptions() {
+        const body = {
+          speed: Number(speedEl.value),
+          sample_rate: Number(sampleRateEl.value),
+        };
+        if (seedEl.value !== "") body.seed = Number(seedEl.value);
+        return body;
+      }
+
+      async function fetchSpeech(text) {
+        const res = await fetch("/v1/speak", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text, ...speakOptions() }),
+        });
+        if (!res.ok) {
+          let detail = res.statusText;
+          try {
+            const err = await res.json();
+            detail = err.detail || detail;
+          } catch (_) {}
+          throw new Error(
+            typeof detail === "string" ? detail : JSON.stringify(detail)
+          );
+        }
+        return res.blob();
+      }
+
+      async function playNext() {
+        if (playing || audioQueue.length === 0) return;
+        playing = true;
+        const blob = audioQueue.shift();
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = URL.createObjectURL(blob);
+        player.src = objectUrl;
+        try {
+          await player.play();
+        } catch (_) {
+          playing = false;
+          playNext();
+          return;
+        }
+        player.onended = () => {
+          playing = false;
+          if (audioQueue.length === 0 && !busy) setStatus("Hazır");
+          playNext();
+        };
+      }
+
+      async function enqueueSpeech(text) {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        const blob = await fetchSpeech(trimmed);
+        audioQueue.push(blob);
+        setStatus("Konuşuyor");
+        playNext();
+      }
+
+      function extractSentences(buffer) {
+        const sentences = [];
+        let rest = buffer;
+        const re = /([^.!?…]+[.!?…]+)(\s+|$)/u;
+        while (true) {
+          const match = rest.match(re);
+          if (!match || match.index !== 0) break;
+          sentences.push(match[1].trim());
+          rest = rest.slice(match[0].length);
+        }
+        return { sentences, rest };
+      }
+
+      async function streamChat(userText) {
+        busy = true;
+        setStatus("Düşünüyor");
+        setChatMeta("");
+        history.push({ role: "user", content: userText });
+        if (history.length > 8) history = history.slice(-8);
+        addBubble("user", userText);
+
+        const botBubble = addBubble("assistant", "");
+        let full = "";
+        let pending = "";
+        const speakJobs = [];
+
+        try {
+          const res = await fetch("/v1/chat", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ messages: history }),
+          });
+          if (!res.ok) {
+            let detail = res.statusText;
+            try {
+              const err = await res.json();
+              detail = err.detail || detail;
+            } catch (_) {}
+            throw new Error(
+              typeof detail === "string" ? detail : JSON.stringify(detail)
+            );
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let raw = "";
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            raw += decoder.decode(value, { stream: true });
+            const parts = raw.split("\n\n");
+            raw = parts.pop() || "";
+
+            for (const part of parts) {
+              const line = part.trim();
+              if (!line.startsWith("data:")) continue;
+              const payload = JSON.parse(line.slice(5).trim());
+              if (payload.type === "token") {
+                full += payload.text;
+                pending += payload.text;
+                botBubble.lastChild.textContent = full;
+                logEl.scrollTop = logEl.scrollHeight;
+                const { sentences, rest } = extractSentences(pending);
+                pending = rest;
+                for (const sentence of sentences) {
+                  speakJobs.push(enqueueSpeech(sentence));
+                }
+              } else if (payload.type === "error") {
+                throw new Error(payload.detail || "Chat error");
+              }
+            }
+          }
+
+          if (pending.trim()) {
+            speakJobs.push(enqueueSpeech(pending));
+          }
+          await Promise.all(speakJobs);
+
+          const reply = full.trim();
+          if (reply) {
+            history.push({ role: "assistant", content: reply });
+            if (history.length > 8) history = history.slice(-8);
+          } else {
+            botBubble.remove();
+            setChatMeta("Boş cevap geldi.", true);
+          }
+        } catch (err) {
+          setChatMeta(err.message || String(err), true);
+          setStatus("Hata");
+          history.pop();
+        } finally {
+          busy = false;
+          if (!playing && audioQueue.length === 0) setStatus("Hazır");
+        }
+      }
+
+      function makeRecognizer({ onFinal, onInterim, onError }) {
+        if (!SpeechRecognition) {
+          onError(
+            "Bu tarayıcı Web Speech API desteklemiyor. Chrome veya Edge dene."
+          );
+          return null;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = "tr-TR";
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
+        let finalTranscript = "";
+
+        recognition.onresult = (event) => {
+          let interim = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const piece = event.results[i][0].transcript;
+            if (event.results[i].isFinal) finalTranscript += piece;
+            else interim += piece;
+          }
+          onInterim((finalTranscript + interim).trim());
+        };
+        recognition.onerror = (event) => {
+          const messages = {
+            "not-allowed": "Mikrofon izni verilmedi.",
+            "no-speech": "Ses algılanamadı. Tekrar dene.",
+            "audio-capture": "Mikrofon bulunamadı.",
+            network: "Tarayıcı tanıma servisine bağlanamadı.",
+          };
+          onError(messages[event.error] || `Tanıma hatası: ${event.error}`);
+        };
+        recognition.onend = () => {
+          onFinal(finalTranscript.trim());
+        };
+        return recognition;
+      }
+
+      let chatListening = false;
+      let chatRecognition = null;
+
+      chatListenBtn.addEventListener("click", () => {
+        if (busy) return;
+        if (chatListening && chatRecognition) {
+          chatRecognition.stop();
+          return;
+        }
+
+        chatRecognition = makeRecognizer({
+          onInterim: (text) => {
+            if (text) setChatMeta(`Algılanan: ${text}`);
+          },
+          onError: (msg) => setChatMeta(msg, true),
+          onFinal: async (text) => {
+            chatListening = false;
+            chatListenBtn.textContent = "Konuş";
+            chatListenBtn.classList.remove("listening");
+            chatListenBtn.disabled = false;
+            if (!text) {
+              if (!chatMeta.classList.contains("error"))
+                setChatMeta("Metin alınamadı.");
+              setStatus("Hazır");
+              return;
+            }
+            setChatMeta("");
+            await streamChat(text);
+          },
+        });
+        if (!chatRecognition) return;
+
+        chatListening = true;
+        chatListenBtn.textContent = "Durdur";
+        chatListenBtn.classList.add("listening");
+        setStatus("Dinliyor");
+        setChatMeta("Dinleniyor…");
+        try {
+          chatRecognition.start();
+        } catch (err) {
+          chatListening = false;
+          chatListenBtn.textContent = "Konuş";
+          chatListenBtn.classList.remove("listening");
+          setChatMeta(err.message || String(err), true);
+          setStatus("Hazır");
+        }
+      });
+
+      chatClearBtn.addEventListener("click", () => {
+        history = [];
+        logEl.innerHTML = "";
+        audioQueue = [];
+        setChatMeta("");
+        setStatus("Hazır");
+      });
+
+      // Echo / plain TTS panel
+      async function speakText(text) {
+        const trimmed = text.trim();
+        if (!trimmed) {
+          setMeta("Metin boş olamaz.", true);
+          return;
+        }
+        speakBtn.disabled = true;
+        listenBtn.disabled = true;
+        setMeta("Üretiliyor…");
+        try {
+          const blob = await fetchSpeech(trimmed);
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          objectUrl = URL.createObjectURL(blob);
+          player.src = objectUrl;
+          await player.play().catch(() => {});
+          setMeta("Hazır");
+        } catch (err) {
+          setMeta(err.message || String(err), true);
+        } finally {
+          speakBtn.disabled = false;
+          listenBtn.disabled = false;
+        }
+      }
+
+      let echoListening = false;
+      let echoRecognition = null;
+      let echoFinal = "";
+
+      listenBtn.addEventListener("click", () => {
+        if (echoListening && echoRecognition) {
+          echoRecognition.stop();
+          return;
+        }
+        echoFinal = "";
+        echoRecognition = makeRecognizer({
+          onInterim: (text) => {
+            textEl.value = text;
+          },
+          onError: (msg) => setMeta(msg, true),
+          onFinal: async (text) => {
+            echoListening = false;
+            listenBtn.textContent = "Konuş";
+            listenBtn.classList.remove("listening");
+            const value = text || textEl.value.trim();
+            if (!value) {
+              if (!meta.classList.contains("error"))
+                setMeta("Metin alınamadı.");
+              return;
+            }
+            textEl.value = value;
+            await speakText(value);
+          },
+        });
+        if (!echoRecognition) return;
+        echoListening = true;
+        listenBtn.textContent = "Durdur";
+        listenBtn.classList.add("listening");
+        setMeta("Dinleniyor…");
+        try {
+          echoRecognition.start();
+        } catch (err) {
+          echoListening = false;
+          listenBtn.textContent = "Konuş";
+          listenBtn.classList.remove("listening");
+          setMeta(err.message || String(err), true);
+        }
+      });
+
+      speakBtn.addEventListener("click", () => speakText(textEl.value));
+
+      tabChat.addEventListener("click", () => {
+        tabChat.classList.add("active");
+        tabEcho.classList.remove("active");
+        chatPanel.classList.remove("hidden");
+        echoPanel.classList.add("hidden");
+      });
+      tabEcho.addEventListener("click", () => {
+        tabEcho.classList.add("active");
+        tabChat.classList.remove("active");
+        echoPanel.classList.remove("hidden");
+        chatPanel.classList.add("hidden");
+      });
+
+      function showChatMode(enabled) {
+        if (enabled) {
+          tabsEl.classList.remove("hidden");
+          subtitle.textContent =
+            "Konuş → OpenAI cevaplar → EMA seslendirir. Ses üretimi bu makinede.";
+          tabChat.classList.add("active");
+          tabEcho.classList.remove("active");
+          chatPanel.classList.remove("hidden");
+          echoPanel.classList.add("hidden");
+        } else {
+          tabsEl.classList.add("hidden");
+          chatPanel.classList.add("hidden");
+          echoPanel.classList.remove("hidden");
+          tabEcho.classList.add("active");
+          tabChat.classList.remove("active");
+          subtitle.textContent =
+            "Metni seslendir. Ses üretimi bu makinede. (LLM kapalı — OPENAI_API_KEY yok)";
+        }
+      }
+
+      fetch("/health")
+        .then((r) => r.json())
+        .then((h) => {
+          showChatMode(Boolean(h.chat));
+          if (h.chat) setChatMeta(`Model: ${h.model}`);
+        })
+        .catch(() => {
+          showChatMode(false);
+          setMeta("Servis hazır değil.", true);
+        });
+    </script>
+  </body>
+</html>

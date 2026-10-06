@@ -1,24 +1,31 @@
-"""Local HTTP API and test page for EMA Lightning TTS."""
+"""turkce-tts-api: ready-to-run Turkish TTS HTTP API (no UI)."""
 
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.chat import ChatService
 from app.tts import TtsService
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 MAX_TEXT_CHARS = 4000
+MAX_HISTORY = 8
 SampleRate = Literal[48000, 24000, 16000, 8000]
 
 tts: TtsService | None = None
+chat: ChatService | None = None
 
 
 class SpeakRequest(BaseModel):
@@ -28,28 +35,55 @@ class SpeakRequest(BaseModel):
     sample_rate: SampleRate = 48000
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=MAX_TEXT_CHARS)
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=MAX_HISTORY)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global tts
+    global tts, chat
     tts = TtsService()
+    chat = ChatService.maybe_create()
     yield
     tts = None
+    chat = None
 
 
-app = FastAPI(title="EMA Lightning TTS", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app = FastAPI(title="turkce-tts-api", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Duration", "X-Seed", "X-Sample-Rate"],
+)
 
 
 @app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+async def root() -> dict:
+    return {
+        "service": "turkce-tts-api",
+        "health": "/health",
+        "speak": "POST /v1/speak",
+        "chat": "POST /v1/chat" if chat is not None else None,
+    }
 
 
 @app.get("/health")
 async def health() -> dict:
     if tts is None:
         raise HTTPException(status_code=503, detail="Model is still loading")
-    return {"status": "ok", "device": tts.device}
+    return {
+        "status": "ok",
+        "device": tts.device,
+        "chat": chat is not None,
+        "model": os.environ.get("OPENAI_MODEL", "gpt-4o-mini") if chat else None,
+    }
 
 
 @app.post("/v1/speak")
@@ -81,3 +115,26 @@ async def speak(body: SpeakRequest) -> Response:
             "X-Sample-Rate": str(result.sample_rate),
         },
     )
+
+
+@app.post("/v1/chat")
+async def chat_stream(body: ChatRequest) -> StreamingResponse:
+    if chat is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Chat disabled: set OPENAI_API_KEY to enable the LLM",
+        )
+
+    messages = [{"role": m.role, "content": m.content.strip()} for m in body.messages]
+    if not messages or messages[-1]["role"] != "user":
+        raise HTTPException(status_code=400, detail="Last message must be from the user")
+
+    async def events():
+        try:
+            async for piece in chat.stream_reply(messages):
+                yield f"data: {json.dumps({'type': 'token', 'text': piece}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        except Exception as exc:  # noqa: BLE001 - surface to client as SSE error
+            yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
