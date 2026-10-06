@@ -6,7 +6,7 @@ Varsayılan motor: [EMA Lightning](https://pypi.org/project/ema-lightning/). Ağ
 
 Örnek çıktı (`POST /v1/speak`, “Merhaba, size nasıl yardımcı olabilirim?”):
 
-![Örnek çıktı](samples/demo.mp4)
+https://github.com/user-attachments/assets/ad2e1d2e-1a12-4119-9928-c39e79d42d15
 
 | Servis      | Adres                 | Açıklama                   |
 | ----------- | --------------------- | -------------------------- |
