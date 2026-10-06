@@ -2,9 +2,7 @@
 
 Kullanıma hazır Türkçe metin-konuşma (TTS) API’si. Docker ile ayağa kalkar; `POST /v1/speak` ile WAV üretir. İsteğe bağlı OpenAI sohbetiyle demo UI üzerinden konuşmalı asistan da denenebilir.
 
-Varsayılan motor: [EMA Lightning](https://pypi.org/project/ema-lightning/). Ağırlıklar ve model kartı: [canberkkkkkk/ema-lightning](https://huggingface.co/canberkkkkkk/ema-lightning) (Apache 2.0). HTTP API motor adını dışarı vermez.
-
-Örnek çıktı: [samples/demo.wav](samples/demo.wav)
+Varsayılan motor: [EMA Lightning](https://pypi.org/project/ema-lightning/). Model: [canberkkkkkk/ema-lightning](https://huggingface.co/canberkkkkkk/ema-lightning) (Apache 2.0).
 
 | Servis      | Adres                 | Açıklama                   |
 | ----------- | --------------------- | -------------------------- |
@@ -76,7 +74,6 @@ cp .env.example .env
 ```
 app/           # FastAPI (TTS adapter + chat)
 ui/            # Statik arayüz + nginx.conf
-samples/       # Örnek WAV (demo.wav)
 Dockerfile     # API imajı (CPU torch)
 docker-compose.yml
 ```
