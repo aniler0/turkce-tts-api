@@ -8,9 +8,9 @@ Varsayılan motor: [EMA Lightning](https://pypi.org/project/ema-lightning/). Ağ
 
 ![Örnek çıktı](samples/demo.mp4)
 
-| Servis | Adres | Açıklama |
-|--------|--------|----------|
-| **UI** | http://127.0.0.1:3000 | Nginx + `ui/` test arayüzü |
+| Servis      | Adres                 | Açıklama                   |
+| ----------- | --------------------- | -------------------------- |
+| **UI**      | http://127.0.0.1:3000 | Nginx + `ui/` test arayüzü |
 | **TTS API** | http://127.0.0.1:8000 | FastAPI (`POST /v1/speak`) |
 
 UI, API’ye nginx üzerinden proxy eder (`/v1/*`, `/health`). `ui/` host’tan mount edilir; arayüz değişince image rebuild gerekmez.
@@ -21,8 +21,8 @@ UI, API’ye nginx üzerinden proxy eder (`/v1/*`, `/health`). `ui/` host’tan 
 docker compose up --build -d
 ```
 
-- Arayüz: http://127.0.0.1:3000  
-- API health: http://127.0.0.1:8000/health  
+- Arayüz: http://127.0.0.1:3000
+- API health: http://127.0.0.1:8000/health
 
 İlk açılışta model indirilir; healthcheck `start_period` ~3 dk. Model önbelleği `turkce-tts-api-model-cache` volume’unda kalır.
 
@@ -51,11 +51,11 @@ curl -sS -X POST http://127.0.0.1:8000/v1/speak \
   --output out.wav
 ```
 
-| Endpoint | Açıklama |
-|----------|----------|
-| `GET /health` | Model yüklü mü, chat açık mı |
-| `POST /v1/speak` | `{ "text": "..." }` → WAV |
-| `POST /v1/chat` | Mesaj geçmişi → SSE token akışı (API key gerekir) |
+| Endpoint         | Açıklama                                          |
+| ---------------- | ------------------------------------------------- |
+| `GET /health`    | Model yüklü mü, chat açık mı                      |
+| `POST /v1/speak` | `{ "text": "..." }` → WAV                         |
+| `POST /v1/chat`  | Mesaj geçmişi → SSE token akışı (API key gerekir) |
 
 ## Ortam değişkenleri
 
@@ -65,11 +65,11 @@ curl -sS -X POST http://127.0.0.1:8000/v1/speak \
 cp .env.example .env
 ```
 
-| Değişken | Açıklama |
-|----------|----------|
-| `OPENAI_API_KEY` | Sohbet için (yoksa LLM kapalı) |
-| `OPENAI_MODEL` | Varsayılan `gpt-4o-mini` |
-| `OPENAI_MAX_TOKENS` | Varsayılan `160` |
+| Değişken            | Açıklama                       |
+| ------------------- | ------------------------------ |
+| `OPENAI_API_KEY`    | Sohbet için (yoksa LLM kapalı) |
+| `OPENAI_MODEL`      | Varsayılan `gpt-4o-mini`       |
+| `OPENAI_MAX_TOKENS` | Varsayılan `160`               |
 
 `.env` git’e eklenmez.
 
